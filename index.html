@@ -862,15 +862,25 @@ try{
 }catch(e){}
 const map=L.map('map',{zoomControl:true,tap:true});
 map.fitBounds([[33.0,125.8],[38.7,129.8]]);
-const ATTR='&copy; OpenStreetMap &copy; CARTO · 노포 데이터: 언론·관공서·백년가게·지식백과·블로그(출처등급 표기)';
+const ATTR='노포 데이터: 언론·관공서·백년가게·지식백과·블로그(출처등급 표기)';
 map.createPane('krbase'); map.getPane('krbase').style.zIndex=150;
 L.geoJSON(KRGEO,{pane:'krbase',interactive:false,style:{color:'#8fb89a',weight:1,fillColor:'#eef3ea',fillOpacity:1}}).addTo(map);
-const tl=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:ATTR,maxZoom:19,subdomains:'abcd',crossOrigin:true}).addTo(map);
-let _sw=false,_ok=false;
-tl.on('tileload',()=>{_ok=true;document.getElementById('offnote').style.display='none';});
-tl.on('tileerror',()=>{ if(_sw)return; _sw=true; const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:ATTR}); osm.on('tileload',()=>{_ok=true;document.getElementById('offnote').style.display='none';}); osm.addTo(map);});
-setTimeout(()=>{ if(!_ok){document.getElementById('offnote').style.display='block';} },2200);
-function fixSize(){try{map.invalidateSize(false);}catch(e){}}
+const TILE_SRC=[
+ ['https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}],
+ ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'&copy; Esri'}]
+];
+let _ok=false,_ti=0,_err=0,tl=null;
+function useTiles(i){
+ if(tl){map.removeLayer(tl);} _ti=i; _err=0;
+ const [u,o]=TILE_SRC[i]; tl=L.tileLayer(u,Object.assign({},o,{attribution:o.attribution+' · '+ATTR,updateWhenIdle:true,keepBuffer:2}));
+ tl.on('tileload',()=>{_ok=true;document.getElementById('offnote').style.display='none';});
+ tl.on('tileerror',()=>{_err++; if(!_ok&&_err>=4&&_ti+1<TILE_SRC.length){useTiles(_ti+1);} });
+ tl.addTo(map);
+}
+useTiles(0);
+setTimeout(()=>{ if(!_ok){document.getElementById('offnote').style.display='block';} },4000);
+let _fitted=false;function fixSize(){try{map.invalidateSize(false);const z=map.getSize();if(!_fitted&&z.x>50&&z.y>50){_fitted=true;map.fitBounds([[33.0,125.8],[38.7,129.8]]);}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){setTimeout(fixSize,200);}});
 ['load','pageshow','orientationchange'].forEach(ev=>window.addEventListener(ev,()=>{setTimeout(fixSize,120);setTimeout(fixSize,450);}));
 setTimeout(fixSize,300);setTimeout(fixSize,900);
 
